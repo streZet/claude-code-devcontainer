@@ -9,6 +9,16 @@ RUN apt-get update && apt-get install -y \
     sudo \
     ca-certificates \
     gnupg \
+    jq \
+    vim \
+    wget \
+    unzip \
+    tar \
+    htop \
+    tree \
+    less \
+    python3 \
+    dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js
@@ -24,7 +34,8 @@ RUN useradd -m -s /bin/bash dev \
 RUN npm install -g @anthropic-ai/claude-code
 
 USER dev
-WORKDIR /home/dev/project
+RUN mkdir -p /home/dev/workspace
+WORKDIR /home/dev/workspace
 
 EXPOSE 3000
 
