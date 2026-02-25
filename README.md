@@ -55,16 +55,17 @@ docker-build.bat
 
 ```bash
 # Linux / macOS
-./docker-run.sh [--workspace <path>] [--name <container-name>]
+./docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh]
 
 # Windows
-docker-run.bat [--workspace <path>] [--name <container-name>]
+docker-run.bat [--workspace <path>] [--name <container-name>] [--ssh]
 ```
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--workspace` | Local directory to mount to `/home/dev/workspace` | none |
 | `--name` | Custom Docker container name | `claude-code-development` |
+| `--ssh` | Enable SSH agent forwarding into the container | disabled |
 
 #### Examples
 
@@ -80,6 +81,9 @@ docker-run.bat [--workspace <path>] [--name <container-name>]
 
 # Both options, any order
 ./docker-run.sh --name my-claude --workspace /path/to/your/workspace
+
+# Enable SSH agent forwarding for git operations
+./docker-run.sh --ssh --workspace /path/to/your/workspace
 ```
 
 ## Volume Mounts
@@ -88,6 +92,23 @@ docker-run.bat [--workspace <path>] [--name <container-name>]
 |------|-----------|-------------|
 | `~/.claude` (Linux/macOS) or `%USERPROFILE%\.claude` (Windows) | `/home/dev/.claude` | Claude Code configuration (always mounted) |
 | Optional path argument | `/home/dev/workspace` | Your projects directory |
+
+## SSH Agent Forwarding
+
+The `--ssh` flag forwards your host's SSH agent into the container, allowing `git clone`, `git push`, and other SSH operations without copying private keys into the container.
+
+| Platform | How it works |
+|----------|-------------|
+| **macOS** | Mounts Docker Desktop's `/run/host-services/ssh-auth.sock` |
+| **Linux** | Mounts `$SSH_AUTH_SOCK` from the host |
+| **Windows** | Forwards the `openssh-ssh-agent` named pipe |
+
+**Prerequisites:** your SSH agent must be running on the host with keys added (`ssh-add -l` to verify).
+
+**Verify inside the container:**
+```bash
+ssh -T git@github.com
+```
 
 ## How It Works
 
