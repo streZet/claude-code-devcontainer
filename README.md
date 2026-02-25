@@ -31,7 +31,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 | **Node.js** | 22 (via NodeSource) |
 | **Claude Code** | `@anthropic-ai/claude-code` (globally installed) |
 | **User** | Non-root `dev` with passwordless sudo |
-| **Tools** | git, ssh, curl, wget, jq, vim, python3, htop, tree, unzip, tar, less, dnsutils |
+| **Tools** | git, gh, ssh, curl, wget, jq, vim, python3, htop, tree, unzip, tar, less, dnsutils |
 | **Port** | 3000 exposed |
 
 ## Quick Start
@@ -58,14 +58,14 @@ docker-build.bat
 ./docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh]
 
 # Windows
-docker-run.bat [--workspace <path>] [--name <container-name>] [--ssh]
+docker-run.bat [--workspace <path>] [--name <container-name>]
 ```
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--workspace` | Local directory to mount to `/home/dev/workspace` | none |
 | `--name` | Custom Docker container name | `claude-code-development` |
-| `--ssh` | Enable SSH agent forwarding into the container | disabled |
+| `--ssh` | Enable SSH agent forwarding (Linux/macOS only) | disabled |
 
 #### Examples
 
@@ -99,11 +99,18 @@ The `--ssh` flag forwards your host's SSH agent into the container, allowing `gi
 
 | Platform | How it works |
 |----------|-------------|
-| **macOS** | Mounts Docker Desktop's `/run/host-services/ssh-auth.sock` |
-| **Linux** | Mounts `$SSH_AUTH_SOCK` from the host |
-| **Windows** | Forwards the `openssh-ssh-agent` named pipe |
+| **macOS** | Forwards SSH agent via Docker Desktop's `/run/host-services/ssh-auth.sock` |
+| **Linux** | Forwards SSH agent via `$SSH_AUTH_SOCK` from the host |
+| **Windows** | Not supported — Docker Desktop on Windows cannot forward the SSH agent socket |
 
-**Prerequisites:** your SSH agent must be running on the host with keys added (`ssh-add -l` to verify).
+> **Windows users:** SSH agent forwarding is not available. Use HTTPS authentication instead:
+> ```bash
+> git config --global url."https://github.com/".insteadOf git@github.com:
+> git config --global credential.helper store
+> ```
+> Then authenticate with a [GitHub Personal Access Token](https://github.com/settings/tokens) on first `git push`/`pull`.
+
+**Prerequisites (macOS/Linux):** your SSH agent must be running on the host with keys added (`ssh-add -l` to verify).
 
 **Verify inside the container:**
 ```bash
