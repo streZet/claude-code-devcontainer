@@ -1,14 +1,25 @@
 @echo off
 
 set VOLUME_ARGS=-v "%USERPROFILE%\.claude:/home/dev/.claude"
-if not "%~2"=="" (
+set CONTAINER_NAME=claude-code-development
+
+:parse_args
+if "%~1"=="" goto run
+if "%~1"=="--workspace" (
+    set VOLUME_ARGS=%VOLUME_ARGS% -v "%~2:/home/dev/workspace"
+    shift
+    shift
+    goto parse_args
+)
+if "%~1"=="--name" (
     set CONTAINER_NAME=%~2
-) else (
-    set CONTAINER_NAME=claude-code-development
+    shift
+    shift
+    goto parse_args
 )
+echo Unknown option: %~1
+echo Usage: docker-run.bat [--workspace ^<path^>] [--name ^<container-name^>]
+exit /b 1
 
-if not "%~1"=="" (
-    set VOLUME_ARGS=%VOLUME_ARGS% -v "%~1:/home/dev/workspace"
-)
-
+:run
 docker run -it --name %CONTAINER_NAME% -p 3000:3000 %VOLUME_ARGS% claude-code-development

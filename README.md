@@ -53,29 +53,34 @@ docker-build.bat
 
 ### Run
 
-#### Empty workspace
-
 ```bash
 # Linux / macOS
+./docker-run.sh [--workspace <path>] [--name <container-name>]
+
+# Windows
+docker-run.bat [--workspace <path>] [--name <container-name>]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--workspace` | Local directory to mount to `/home/dev/workspace` | none |
+| `--name` | Custom Docker container name | `claude-code-development` |
+
+#### Examples
+
+```bash
+# Empty workspace, default container name
 ./docker-run.sh
 
-# Windows
-docker-run.bat
+# Mount a local directory
+./docker-run.sh --workspace /path/to/your/workspace
+
+# Custom container name only
+./docker-run.sh --name my-claude
+
+# Both options, any order
+./docker-run.sh --name my-claude --workspace /path/to/your/workspace
 ```
-
-Starts the container with an empty `/home/dev/workspace` directory where you can clone repositories.
-
-#### Mount a local directory
-
-```bash
-# Linux / macOS
-./docker-run.sh /path/to/your/workspace
-
-# Windows
-docker-run.bat C:\path\to\your\workspace
-```
-
-Mounts the specified directory to `/home/dev/workspace` inside the container. You can mount a single project or an entire directory with multiple projects.
 
 ## Volume Mounts
 
