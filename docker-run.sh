@@ -30,4 +30,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-docker run -it --name "$CONTAINER_NAME" -p 3000:3000 $VOLUME_ARGS $SSH_ARGS claude-code-development
+if docker container inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
+    echo "Container \"$CONTAINER_NAME\" already exists:"
+    docker ps -a --filter "name=^${CONTAINER_NAME}$" --format "  ID: {{.ID}}  Image: {{.Image}}  Status: {{.Status}}  Created: {{.CreatedAt}}"
+    echo ""
+    echo "Starting existing container..."
+    docker start -ai "$CONTAINER_NAME"
+else
+    docker run -it --name "$CONTAINER_NAME" -p 3000:3000 $VOLUME_ARGS $SSH_ARGS claude-code-development
+fi

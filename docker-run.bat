@@ -21,4 +21,13 @@ echo Usage: docker-run.bat [--workspace ^<path^>] [--name ^<container-name^>]
 exit /b 1
 
 :run
-docker run -it --name %CONTAINER_NAME% -p 3000:3000 %VOLUME_ARGS% claude-code-development
+docker container inspect %CONTAINER_NAME% >nul 2>&1
+if %errorlevel%==0 (
+    echo Container "%CONTAINER_NAME%" already exists:
+    docker ps -a --filter "name=^%CONTAINER_NAME%$" --format "  ID: {{.ID}}  Image: {{.Image}}  Status: {{.Status}}  Created: {{.CreatedAt}}"
+    echo.
+    echo Starting existing container...
+    docker start -ai %CONTAINER_NAME%
+) else (
+    docker run -it --name %CONTAINER_NAME% -p 3000:3000 %VOLUME_ARGS% claude-code-development
+)
