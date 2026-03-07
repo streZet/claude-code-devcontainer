@@ -39,7 +39,10 @@ RUN useradd -m -s /bin/bash dev \
 USER dev
 
 # Claude Code (native install)
-RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/home/dev/.local/bin:${PATH}"
+RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install-claude.sh \
+    && yes | bash /tmp/install-claude.sh \
+    && rm /tmp/install-claude.sh
 RUN mkdir -p /home/dev/workspace
 WORKDIR /home/dev/workspace
 
