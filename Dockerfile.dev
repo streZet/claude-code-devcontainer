@@ -36,10 +36,10 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 RUN useradd -m -s /bin/bash dev \
     && echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Claude Code
-RUN npm install -g @anthropic-ai/claude-code
-
 USER dev
+
+# Claude Code (native install)
+RUN curl -fsSL https://claude.ai/install.sh | bash
 RUN mkdir -p /home/dev/workspace
 WORKDIR /home/dev/workspace
 
