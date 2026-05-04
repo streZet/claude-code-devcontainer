@@ -36,6 +36,14 @@ ENV PATH="/home/dev/.local/bin:${PATH}"
 RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install-claude.sh \
     && yes | bash /tmp/install-claude.sh \
     && rm /tmp/install-claude.sh
+
+# Wrapper: always run `claude` with --dangerously-skip-permissions
+USER root
+COPY claude-wrapper.sh /usr/local/bin/claude
+RUN chmod +x /usr/local/bin/claude
+USER dev
+ENV PATH="/usr/local/bin:${PATH}"
+
 RUN mkdir -p /home/dev/workspace
 WORKDIR /home/dev/workspace
 
