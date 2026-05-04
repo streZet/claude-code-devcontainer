@@ -21,6 +21,8 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 - **Cross-platform** — works on Linux, macOS, and Windows with provided shell and batch scripts
 - **Mount your projects** — work on existing local codebases without copying files into the container
 - **Persistent config** — your `~/.claude` settings are mounted automatically and survive container restarts
+- **`claude` wrapper** — `claude` inside the container is always invoked with `--dangerously-skip-permissions`, and on first run auto-initializes `~/.claude.json` (skips onboarding and trust prompts) so sessions start immediately
+- **OAuth token passthrough** — host `CLAUDE_CODE_OAUTH_TOKEN` is mounted as a Docker secret (`/run/secrets/claude_token`), avoiding env-var exposure
 
 ## What's Inside
 
@@ -61,9 +63,11 @@ docker-run.bat [--workspace <path>] [--name <container-name>]
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--workspace` | Local directory to mount to `/home/dev/workspace` | none |
-| `--name` | Custom Docker container name | `claude-code-development` |
+| `--workspace` | Local directory to mount to `/home/dev/<basename>` (basename sanitized to `[a-zA-Z0-9._-]`) | none |
+| `--name` | Custom Docker container name | `claude-code-development_<basename>` if `--workspace` given, otherwise `claude-code-development` |
 | `--ssh` | Enable SSH agent forwarding (Linux/macOS only) | disabled |
+
+Each project gets its own working directory inside the container and its own container by default, so you can run multiple projects in parallel without collisions.
 
 #### Examples
 
@@ -89,7 +93,8 @@ docker-run.bat [--workspace <path>] [--name <container-name>]
 | Host | Container | Description |
 |------|-----------|-------------|
 | `~/.claude` (Linux/macOS) or `%USERPROFILE%\.claude` (Windows) | `/home/dev/.claude` | Claude Code configuration (always mounted) |
-| Optional path argument | `/home/dev/workspace` | Your projects directory |
+| `--workspace <path>` | `/home/dev/<basename>` | Your project directory; container `cwd` is set here |
+| Host `CLAUDE_CODE_OAUTH_TOKEN` env var | `/run/secrets/claude_token` (read-only) | OAuth token, only mounted if the env var is set on the host |
 
 ## SSH Agent Forwarding
 
@@ -117,10 +122,13 @@ ssh -T git@github.com
 
 ## How It Works
 
-1. The Dockerfile builds an Ubuntu 24.04 image with Claude Code native binary installed
-2. A non-root `dev` user is created for security
-3. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your API key and settings
-4. Optionally mount any local directory as the workspace to use Claude Code on your existing projects
+1. The Dockerfile builds an Ubuntu 24.04 image with the Claude Code native binary installed.
+2. A non-root `dev` user is created for security.
+3. Files under `rootfs/` are overlaid onto the image (path under `rootfs/` mirrors the path inside the container). The wrapper at `/usr/local/bin/claude` shadows the real binary in `PATH` and always passes `--dangerously-skip-permissions`.
+4. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your settings.
+5. With `--workspace <path>`, the host directory is mounted at `/home/dev/<basename>` and used as the container's `cwd`. The default container name is suffixed with the same basename so each project gets its own container.
+6. If the host has `CLAUDE_CODE_OAUTH_TOKEN` set, the script writes it to a temp file and bind-mounts it as `/run/secrets/claude_token` (read-only). The wrapper exports it back to the env only inside the `claude` process.
+7. The wrapper also self-heals `~/.claude.json` on each invocation, ensuring `hasCompletedOnboarding`, `lastOnboardingVersion`, and per-project `hasTrustDialogAccepted` are set.
 
 ## Related Projects
 
