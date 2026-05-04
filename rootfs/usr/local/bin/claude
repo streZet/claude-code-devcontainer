@@ -1,0 +1,31 @@
+#!/bin/bash
+CLAUDE_BIN=/home/dev/.local/bin/claude
+CONFIG=/home/dev/.claude.json
+TEMPLATE=/usr/local/share/claude-devcontainer/claude.json.template
+
+if [[ -r /run/secrets/claude_token ]]; then
+    export CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/secrets/claude_token)"
+fi
+
+if [[ ! -f "$CONFIG" ]]; then
+    VERSION=$("$CLAUDE_BIN" --version | awk '{print $1}')
+    sed "s/__CLAUDE_VERSION__/$VERSION/" "$TEMPLATE" > "$CONFIG"
+fi
+
+NEEDS_UPDATE=$(jq --arg p "$PWD" '
+    (.hasCompletedOnboarding != true) or
+    (.lastOnboardingVersion == null) or
+    (.projects[$p].hasTrustDialogAccepted != true)
+' "$CONFIG")
+
+if [[ "$NEEDS_UPDATE" == "true" ]]; then
+    VERSION=${VERSION:-$("$CLAUDE_BIN" --version | awk '{print $1}')}
+    tmp=$(mktemp)
+    jq --arg v "$VERSION" --arg p "$PWD" '
+        .hasCompletedOnboarding = true |
+        (if .lastOnboardingVersion == null then .lastOnboardingVersion = $v else . end) |
+        .projects[$p].hasTrustDialogAccepted = true
+    ' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
+fi
+
+exec "$CLAUDE_BIN" --dangerously-skip-permissions "$@"
