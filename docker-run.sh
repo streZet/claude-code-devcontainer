@@ -1,6 +1,11 @@
 #!/bin/bash
 
 VOLUME_ARGS=(-v "$HOME/.claude:/home/dev/.claude")
+if [[ -f "$HOME/.gitconfig" ]]; then
+    VOLUME_ARGS+=(-v "$HOME/.gitconfig:/home/dev/.gitconfig:ro")
+fi
+mkdir -p "$HOME/.config/gh-devcontainer"
+VOLUME_ARGS+=(-v "$HOME/.config/gh-devcontainer:/home/dev/.config/gh")
 CONTAINER_NAME=""
 PROJECT_NAME=""
 SSH_ARGS=()

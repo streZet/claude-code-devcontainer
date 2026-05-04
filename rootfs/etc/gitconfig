@@ -1,0 +1,4 @@
+[safe]
+    directory = *
+[credential]
+    helper = !gh auth git-credential

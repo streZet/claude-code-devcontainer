@@ -2,6 +2,11 @@
 setlocal enabledelayedexpansion
 
 set VOLUME_ARGS=-v "%USERPROFILE%\.claude:/home/dev/.claude"
+if exist "%USERPROFILE%\.gitconfig" (
+    set VOLUME_ARGS=!VOLUME_ARGS! -v "%USERPROFILE%\.gitconfig:/home/dev/.gitconfig:ro"
+)
+if not exist "%USERPROFILE%\.config\gh-devcontainer" mkdir "%USERPROFILE%\.config\gh-devcontainer"
+set VOLUME_ARGS=!VOLUME_ARGS! -v "%USERPROFILE%\.config\gh-devcontainer:/home/dev/.config/gh"
 set CONTAINER_NAME=
 set PROJECT_NAME=
 set WORKDIR_ARGS=

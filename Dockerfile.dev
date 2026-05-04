@@ -37,10 +37,11 @@ RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install-claude.sh \
     && yes | bash /tmp/install-claude.sh \
     && rm /tmp/install-claude.sh
 
-# Wrapper: always run `claude` with --dangerously-skip-permissions
+# Overlay container files from rootfs/
 USER root
 COPY rootfs/ /
-RUN chmod +x /usr/local/bin/claude
+RUN chmod +x /usr/local/bin/claude \
+    && chown -R dev:dev /home/dev
 USER dev
 ENV PATH="/usr/local/bin:${PATH}"
 
