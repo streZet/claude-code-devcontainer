@@ -1,2 +1,2 @@
 #!/bin/bash
-docker build -f Dockerfile.dev -t claude-code-development .
+docker build --no-cache -f Dockerfile.dev -t claude-code-development .
