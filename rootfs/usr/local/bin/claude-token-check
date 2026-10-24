@@ -3,7 +3,18 @@ SECRET=/run/secrets/claude_token
 
 [[ -r "$SECRET" ]] || exit 0
 
-if [[ "$(cat "$SECRET")" != "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
+pid=$PPID
+while [[ "$pid" -gt 1 ]]; do
+    if tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -q '^CLAUDE_CODE_OAUTH_TOKEN='; then
+        CURRENT=$(tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^CLAUDE_CODE_OAUTH_TOKEN=//p')
+        break
+    fi
+    pid=$(awk '{print $4}' "/proc/$pid/stat")
+done
+
+[[ -n "$CURRENT" ]] || exit 0
+
+if [[ "$(cat "$SECRET")" != "$CURRENT" ]]; then
     jq -n '{systemMessage: "CLAUDE_CODE_OAUTH_TOKEN was updated on the host. Restart claude to use the new token."}'
 fi
 exit 0
