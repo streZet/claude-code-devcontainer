@@ -39,7 +39,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 ### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) installed and running
-- An [Anthropic API key](https://console.anthropic.com/) for Claude Code authentication
+- A Claude account; recommended: set `CLAUDE_CODE_OAUTH_TOKEN` on the host (generate it with `claude setup-token`), otherwise log in inside the container
 
 ### Build
 
@@ -50,6 +50,8 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 # Windows
 docker-build.bat
 ```
+
+The build always runs with `--no-cache`, so every rebuild installs the latest Claude Code. Use `--recreate` on the next run to apply the new image to an existing container.
 
 ### Run
 
@@ -97,8 +99,12 @@ Each project gets its own working directory inside the container and its own con
 | Host | Container | Description |
 |------|-----------|-------------|
 | `~/.claude` (Linux/macOS) or `%USERPROFILE%\.claude` (Windows) | `/home/dev/.claude` | Claude Code configuration (always mounted) |
+| `~/.gitconfig` | `/home/dev/.gitconfig` (read-only) | Git identity, only mounted if the file exists on the host |
+| `~/.config/gh-devcontainer` | `/home/dev/.config/gh` | GitHub CLI auth (`gh auth login`), separate from the host `gh`; created automatically |
 | `--workspace <path>` | `/home/dev/<basename>` | Your project directory; container `cwd` is set here |
-| Host `CLAUDE_CODE_OAUTH_TOKEN` env var | `/run/secrets/claude_token` (read-only) | OAuth token, only mounted if the env var is set on the host |
+| `~/.config/claude-devcontainer/<container>.token` (from host `CLAUDE_CODE_OAUTH_TOKEN`) | `/run/secrets/claude_token` (read-only) | OAuth token, only mounted if the env var is set when the container is created |
+
+Everything outside these mounts lives only inside the container and is lost on `--recreate`.
 
 ## SSH Agent Forwarding
 
@@ -110,12 +116,11 @@ The `--ssh` flag forwards your host's SSH agent into the container, allowing `gi
 | **Linux** | Forwards SSH agent via `$SSH_AUTH_SOCK` from the host |
 | **Windows** | Not supported — Docker Desktop on Windows cannot forward the SSH agent socket |
 
-> **Windows users:** SSH agent forwarding is not available. Use HTTPS authentication instead:
+> **Windows users:** SSH agent forwarding is not available. Use HTTPS instead — the container's git is preconfigured to use the GitHub CLI as credential helper, so log in once:
 > ```bash
-> git config --global url."https://github.com/".insteadOf git@github.com:
-> git config --global credential.helper store
+> gh auth login
 > ```
-> Then authenticate with a [GitHub Personal Access Token](https://github.com/settings/tokens) on first `git push`/`pull`.
+> The login is persisted in `%USERPROFILE%\.config\gh-devcontainer` and survives `--recreate`. Use HTTPS remote URLs (`https://github.com/...`).
 
 **Prerequisites (macOS/Linux):** your SSH agent must be running on the host with keys added (`ssh-add -l` to verify).
 
@@ -128,8 +133,8 @@ ssh -T git@github.com
 
 1. The Dockerfile builds an Ubuntu 24.04 image with the Claude Code native binary installed.
 2. A non-root `dev` user is created for security.
-3. Files under `rootfs/` are overlaid onto the image (path under `rootfs/` mirrors the path inside the container). The wrapper at `/usr/local/bin/claude` shadows the real binary in `PATH` and always passes `--dangerously-skip-permissions`.
-4. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your settings.
+3. Files under `rootfs/` are overlaid onto the image (path under `rootfs/` mirrors the path inside the container). The wrapper at `/usr/local/bin/claude` shadows the real binary in `PATH` and always passes `--dangerously-skip-permissions` and `--settings /usr/local/share/claude-devcontainer/settings.json` (container-only hooks, merged with your host settings). `/etc/gitconfig` sets `safe.directory = *` and `gh auth git-credential` as the credential helper.
+4. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your settings. `~/.gitconfig` (if present) and `~/.config/gh-devcontainer` are mounted as well.
 5. With `--workspace <path>`, the host directory is mounted at `/home/dev/<basename>` and used as the container's `cwd`. The default container name is suffixed with the same basename so each project gets its own container.
 6. If the host has `CLAUDE_CODE_OAUTH_TOKEN` set, the script writes it to `~/.config/claude-devcontainer/<container>.token` and bind-mounts it as `/run/secrets/claude_token` (read-only). The wrapper exports it back to the env only inside the `claude` process. On every re-run of the script the file is overwritten with the current host value; a `UserPromptSubmit` hook (`/usr/local/bin/claude-token-check`, loaded via `--settings`) warns when the running `claude` uses an outdated token and needs a restart.
 7. The wrapper also self-heals `~/.claude.json` on each invocation, ensuring `hasCompletedOnboarding`, `lastOnboardingVersion`, and per-project `hasTrustDialogAccepted` are set.
