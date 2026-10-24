@@ -11,6 +11,7 @@ PROJECT_NAME=""
 SSH_ARGS=()
 WORKDIR_ARGS=()
 SECRET_ARGS=()
+RECREATE=false
 
 TOKEN_DIR="$HOME/.config/claude-devcontainer"
 
@@ -42,9 +43,13 @@ while [[ $# -gt 0 ]]; do
             fi
             shift
             ;;
+        --recreate)
+            RECREATE=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh]"
+            echo "Usage: docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh] [--recreate]"
             exit 1
             ;;
     esac
@@ -56,6 +61,11 @@ if [[ -z "$CONTAINER_NAME" ]]; then
     else
         CONTAINER_NAME="claude-code-development"
     fi
+fi
+
+if [[ "$RECREATE" == true ]] && docker container inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
+    echo "Removing container \"$CONTAINER_NAME\"..."
+    docker rm -f "$CONTAINER_NAME" > /dev/null || exit 1
 fi
 
 if docker container inspect "$CONTAINER_NAME" > /dev/null 2>&1; then

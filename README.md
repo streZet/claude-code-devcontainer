@@ -55,10 +55,10 @@ docker-build.bat
 
 ```bash
 # Linux / macOS
-./docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh]
+./docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh] [--recreate]
 
 # Windows
-docker-run.bat [--workspace <path>] [--name <container-name>]
+docker-run.bat [--workspace <path>] [--name <container-name>] [--recreate]
 ```
 
 | Option | Description | Default |
@@ -66,6 +66,7 @@ docker-run.bat [--workspace <path>] [--name <container-name>]
 | `--workspace` | Local directory to mount to `/home/dev/<basename>` (basename sanitized to `[a-zA-Z0-9._-]`) | none |
 | `--name` | Custom Docker container name | `claude-code-development_<basename>` if `--workspace` given, otherwise `claude-code-development` |
 | `--ssh` | Enable SSH agent forwarding (Linux/macOS only) | disabled |
+| `--recreate` | Remove the existing container and create a new one from the current image (data outside mounted volumes is lost) | disabled |
 
 Each project gets its own working directory inside the container and its own container by default, so you can run multiple projects in parallel without collisions.
 
@@ -86,6 +87,9 @@ Each project gets its own working directory inside the container and its own con
 
 # Enable SSH agent forwarding for git operations
 ./docker-run.sh --ssh --workspace /path/to/your/workspace
+
+# Recreate the container after rebuilding the image
+./docker-run.sh --recreate --workspace /path/to/your/workspace
 ```
 
 ## Volume Mounts

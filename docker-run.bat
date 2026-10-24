@@ -11,6 +11,7 @@ set CONTAINER_NAME=
 set PROJECT_NAME=
 set WORKDIR_ARGS=
 set SECRET_ARGS=
+set RECREATE=
 
 set TOKEN_DIR=%USERPROFILE%\.config\claude-devcontainer
 :parse_args
@@ -32,8 +33,13 @@ if "%~1"=="--name" (
     shift
     goto parse_args
 )
+if "%~1"=="--recreate" (
+    set RECREATE=1
+    shift
+    goto parse_args
+)
 echo Unknown option: %~1
-echo Usage: docker-run.bat [--workspace ^<path^>] [--name ^<container-name^>]
+echo Usage: docker-run.bat [--workspace ^<path^>] [--name ^<container-name^>] [--recreate]
 exit /b 1
 
 :run
@@ -42,6 +48,13 @@ if "!CONTAINER_NAME!"=="" (
         set CONTAINER_NAME=claude-code-development
     ) else (
         set CONTAINER_NAME=claude-code-development_!PROJECT_NAME!
+    )
+)
+
+if defined RECREATE (
+    docker container inspect !CONTAINER_NAME! >nul 2>&1 && (
+        echo Removing container "!CONTAINER_NAME!"...
+        docker rm -f !CONTAINER_NAME! >nul || exit /b 1
     )
 )
 
