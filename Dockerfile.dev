@@ -40,7 +40,7 @@ RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install-claude.sh \
 # Overlay container files from rootfs/
 USER root
 COPY rootfs/ /
-RUN chmod +x /usr/local/bin/claude \
+RUN chmod +x /usr/local/bin/claude /usr/local/bin/claude-token-check \
     && chown -R dev:dev /home/dev
 USER dev
 ENV PATH="/usr/local/bin:${PATH}"

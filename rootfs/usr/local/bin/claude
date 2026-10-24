@@ -2,6 +2,7 @@
 CLAUDE_BIN=/home/dev/.local/bin/claude
 CONFIG=/home/dev/.claude.json
 TEMPLATE=/usr/local/share/claude-devcontainer/claude.json.template
+SETTINGS=/usr/local/share/claude-devcontainer/settings.json
 
 if [[ -r /run/secrets/claude_token ]]; then
     export CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/secrets/claude_token)"
@@ -28,4 +29,4 @@ if [[ "$NEEDS_UPDATE" == "true" ]]; then
     ' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
 fi
 
-exec "$CLAUDE_BIN" --dangerously-skip-permissions "$@"
+exec "$CLAUDE_BIN" --dangerously-skip-permissions --settings "$SETTINGS" "$@"

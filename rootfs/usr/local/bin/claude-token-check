@@ -1,0 +1,9 @@
+#!/bin/bash
+SECRET=/run/secrets/claude_token
+
+[[ -r "$SECRET" ]] || exit 0
+
+if [[ "$(cat "$SECRET")" != "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
+    jq -n '{systemMessage: "CLAUDE_CODE_OAUTH_TOKEN was updated on the host. Restart claude to use the new token."}'
+fi
+exit 0
