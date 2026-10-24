@@ -53,13 +53,14 @@ if %errorlevel%==0 (
     for /f "tokens=1,* delims==" %%A in ('docker container inspect !CONTAINER_NAME! --format "{{range .Mounts}}{{.Destination}}={{.Source}}{{println}}{{end}}"') do (
         if "%%A"=="/run/secrets/claude_token" set "TOKEN_FILE=%%B"
     )
-    if defined TOKEN_FILE if not exist "!TOKEN_FILE!" (
-        if not defined CLAUDE_CODE_OAUTH_TOKEN (
+    if defined TOKEN_FILE (
+        if defined CLAUDE_CODE_OAUTH_TOKEN (
+            echo Updating token file "!TOKEN_FILE!"...
+            call :write_token
+        ) else if not exist "!TOKEN_FILE!" (
             echo Error: token file "!TOKEN_FILE!" is missing and CLAUDE_CODE_OAUTH_TOKEN is not set.
             exit /b 1
         )
-        echo Restoring token file "!TOKEN_FILE!"...
-        call :write_token
     )
     echo.
     echo Starting existing container...

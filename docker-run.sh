@@ -62,13 +62,14 @@ if docker container inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
     echo "Container \"$CONTAINER_NAME\" already exists:"
     docker container inspect "$CONTAINER_NAME" --format "  Image: {{.Config.Image}}  Status: {{.State.Status}}  Created: {{.Created}}"
     TOKEN_FILE=$(docker container inspect "$CONTAINER_NAME" --format '{{range .Mounts}}{{if eq .Destination "/run/secrets/claude_token"}}{{.Source}}{{end}}{{end}}')
-    if [[ -n "$TOKEN_FILE" && ! -f "$TOKEN_FILE" ]]; then
-        if [[ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
+    if [[ -n "$TOKEN_FILE" ]]; then
+        if [[ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
+            echo "Updating token file \"$TOKEN_FILE\"..."
+            write_token "$TOKEN_FILE"
+        elif [[ ! -f "$TOKEN_FILE" ]]; then
             echo "Error: token file \"$TOKEN_FILE\" is missing and CLAUDE_CODE_OAUTH_TOKEN is not set."
             exit 1
         fi
-        echo "Restoring token file \"$TOKEN_FILE\"..."
-        write_token "$TOKEN_FILE"
     fi
     echo ""
     echo "Starting existing container..."
