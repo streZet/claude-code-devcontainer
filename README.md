@@ -32,7 +32,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 | **Claude Code** | Native binary (installed via official installer) |
 | **User** | Non-root `dev` with passwordless sudo |
 | **Tools** | git, gh, ssh, curl, wget, jq, vim, python3, htop, tree, unzip, tar, less, dnsutils |
-| **Port** | 3000 exposed |
+| **Port** | 3000 exposed, mapped to the first free host port in 3000–3100 (or `--port`) |
 
 ## Quick Start
 
@@ -57,7 +57,7 @@ The build always runs with `--no-cache`, so every rebuild installs the latest Cl
 
 ```bash
 # Linux / macOS
-./docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh] [--recreate]
+./docker-run.sh [--workspace <path>] [--name <container-name>] [--port <host-port>] [--ssh] [--recreate]
 
 # Windows
 docker-run.bat [--workspace <path>] [--name <container-name>] [--port <host-port>] [--recreate]
@@ -68,7 +68,7 @@ docker-run.bat [--workspace <path>] [--name <container-name>] [--port <host-port
 | `--workspace` | Local directory to mount to `/home/dev/<basename>` (basename sanitized to `[a-zA-Z0-9._-]`) | none |
 | `--name` | Custom Docker container name | `claude-code-development_<basename>` if `--workspace` given, otherwise `claude-code-development` |
 | `--ssh` | Enable SSH agent forwarding (Linux/macOS only) | disabled |
-| `--port` | Host port mapped to container port 3000; fails if busy (Windows only, applied on container creation) | first free port in 3000–3100 |
+| `--port` | Host port mapped to container port 3000; fails if busy (applied on container creation) | first free port in 3000–3100 |
 | `--recreate` | Remove the existing container and create a new one from the current image (data outside mounted volumes is lost) | disabled |
 
 Each project gets its own working directory inside the container and its own container by default, so you can run multiple projects in parallel without collisions.
@@ -90,6 +90,9 @@ Each project gets its own working directory inside the container and its own con
 
 # Enable SSH agent forwarding for git operations
 ./docker-run.sh --ssh --workspace /path/to/your/workspace
+
+# Use a specific host port (error if it is busy)
+./docker-run.sh --port 3005 --workspace /path/to/your/workspace
 
 # Recreate the container after rebuilding the image
 ./docker-run.sh --recreate --workspace /path/to/your/workspace

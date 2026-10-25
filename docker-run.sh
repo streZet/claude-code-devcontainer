@@ -12,6 +12,10 @@ SSH_ARGS=()
 WORKDIR_ARGS=()
 SECRET_ARGS=()
 RECREATE=false
+PORT=""
+HOST_PORT=""
+PORT_RANGE_START=3000
+PORT_RANGE_END=3100
 
 TOKEN_DIR="$HOME/.config/claude-devcontainer"
 
@@ -19,6 +23,31 @@ write_token() {
     mkdir -p "$(dirname "$1")"
     printf '%s' "$CLAUDE_CODE_OAUTH_TOKEN" > "$1"
     chmod 600 "$1"
+}
+
+is_port_free() {
+    [[ -z "$(docker ps -q --filter "publish=$1")" ]] || return 1
+    ! (exec 3<>"/dev/tcp/127.0.0.1/$1") 2> /dev/null
+}
+
+resolve_port() {
+    if [[ -n "$PORT" ]]; then
+        if ! is_port_free "$PORT"; then
+            echo "Error: port $PORT is already in use."
+            return 1
+        fi
+        HOST_PORT="$PORT"
+        return 0
+    fi
+    local candidate
+    for ((candidate = PORT_RANGE_START; candidate <= PORT_RANGE_END; candidate++)); do
+        if is_port_free "$candidate"; then
+            HOST_PORT="$candidate"
+            return 0
+        fi
+    done
+    echo "Error: no free port in range $PORT_RANGE_START-$PORT_RANGE_END."
+    return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -47,9 +76,13 @@ while [[ $# -gt 0 ]]; do
             RECREATE=true
             shift
             ;;
+        --port)
+            PORT="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh] [--recreate]"
+            echo "Usage: docker-run.sh [--workspace <path>] [--name <container-name>] [--port <host-port>] [--ssh] [--recreate]"
             exit 1
             ;;
     esac
@@ -85,10 +118,12 @@ if docker container inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
     echo "Starting existing container..."
     docker start -ai "$CONTAINER_NAME"
 else
+    resolve_port || exit 1
     if [[ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
         TOKEN_FILE="$TOKEN_DIR/$CONTAINER_NAME.token"
         write_token "$TOKEN_FILE"
         SECRET_ARGS=(--mount "type=bind,src=$TOKEN_FILE,dst=/run/secrets/claude_token,readonly")
     fi
-    docker run -it --name "$CONTAINER_NAME" -p 3000:3000 "${VOLUME_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
+    echo "Host port: $HOST_PORT -> container port 3000"
+    docker run -it --name "$CONTAINER_NAME" -p "$HOST_PORT:3000""${VOLUME_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
 fi
