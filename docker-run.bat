@@ -12,6 +12,10 @@ set PROJECT_NAME=
 set WORKDIR_ARGS=
 set SECRET_ARGS=
 set RECREATE=
+set PORT=
+set HOST_PORT=
+set PORT_RANGE_START=3000
+set PORT_RANGE_END=3100
 
 set TOKEN_DIR=%USERPROFILE%\.config\claude-devcontainer
 :parse_args
@@ -38,8 +42,14 @@ if "%~1"=="--recreate" (
     shift
     goto parse_args
 )
+if "%~1"=="--port" (
+    set "PORT=%~2"
+    shift
+    shift
+    goto parse_args
+)
 echo Unknown option: %~1
-echo Usage: docker-run.bat [--workspace ^<path^>] [--name ^<container-name^>] [--recreate]
+echo Usage: docker-run.bat [--workspace ^<path^>] [--name ^<container-name^>] [--port ^<host-port^>] [--recreate]
 exit /b 1
 
 :run
@@ -56,6 +66,12 @@ if defined RECREATE (
         echo Removing container "!CONTAINER_NAME!"...
         docker rm -f !CONTAINER_NAME! >nul || exit /b 1
     )
+)
+
+docker container inspect !CONTAINER_NAME! >nul 2>&1
+if errorlevel 1 (
+    call :resolve_port
+    if errorlevel 1 exit /b 1
 )
 
 docker container inspect !CONTAINER_NAME! >nul 2>&1
@@ -85,7 +101,8 @@ if %errorlevel%==0 (
         call :write_token
         set SECRET_ARGS=--mount type=bind,src="!TOKEN_FILE!",dst=/run/secrets/claude_token,readonly
     )
-    docker run -it --name !CONTAINER_NAME! -p 3000:3000 !VOLUME_ARGS! !WORKDIR_ARGS! !SECRET_ARGS! claude-code-development
+    echo Host port: !HOST_PORT! -^> container port 3000
+    docker run -it --name !CONTAINER_NAME! -p !HOST_PORT!:3000 !VOLUME_ARGS! !WORKDIR_ARGS! !SECRET_ARGS! claude-code-development
 )
 endlocal
 exit /b
@@ -93,3 +110,32 @@ exit /b
 :write_token
 powershell -NoProfile -Command "Set-Content -NoNewline -Path $env:TOKEN_FILE -Value $env:CLAUDE_CODE_OAUTH_TOKEN"
 exit /b
+
+:resolve_port
+if defined PORT (
+    call :is_port_free !PORT!
+    if errorlevel 1 (
+        echo Error: port !PORT! is already in use.
+        exit /b 1
+    )
+    set "HOST_PORT=!PORT!"
+    exit /b 0
+)
+set /a CANDIDATE=PORT_RANGE_START
+:resolve_port_loop
+call :is_port_free !CANDIDATE!
+if not errorlevel 1 (
+    set "HOST_PORT=!CANDIDATE!"
+    exit /b 0
+)
+set /a CANDIDATE+=1
+if !CANDIDATE! gtr !PORT_RANGE_END! (
+    echo Error: no free port in range !PORT_RANGE_START!-!PORT_RANGE_END!.
+    exit /b 1
+)
+goto resolve_port_loop
+
+:is_port_free
+netstat -ano | findstr /R /C:":%~1 .*LISTENING" >nul
+if errorlevel 1 exit /b 0
+exit /b 1

@@ -60,7 +60,7 @@ The build always runs with `--no-cache`, so every rebuild installs the latest Cl
 ./docker-run.sh [--workspace <path>] [--name <container-name>] [--ssh] [--recreate]
 
 # Windows
-docker-run.bat [--workspace <path>] [--name <container-name>] [--recreate]
+docker-run.bat [--workspace <path>] [--name <container-name>] [--port <host-port>] [--recreate]
 ```
 
 | Option | Description | Default |
@@ -68,6 +68,7 @@ docker-run.bat [--workspace <path>] [--name <container-name>] [--recreate]
 | `--workspace` | Local directory to mount to `/home/dev/<basename>` (basename sanitized to `[a-zA-Z0-9._-]`) | none |
 | `--name` | Custom Docker container name | `claude-code-development_<basename>` if `--workspace` given, otherwise `claude-code-development` |
 | `--ssh` | Enable SSH agent forwarding (Linux/macOS only) | disabled |
+| `--port` | Host port mapped to container port 3000; fails if busy (Windows only, applied on container creation) | first free port in 3000–3100 |
 | `--recreate` | Remove the existing container and create a new one from the current image (data outside mounted volumes is lost) | disabled |
 
 Each project gets its own working directory inside the container and its own container by default, so you can run multiple projects in parallel without collisions.
