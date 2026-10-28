@@ -7,6 +7,7 @@ if exist "%USERPROFILE%\.gitconfig" (
 )
 if not exist "%USERPROFILE%\.config\gh-devcontainer" mkdir "%USERPROFILE%\.config\gh-devcontainer"
 set VOLUME_ARGS=!VOLUME_ARGS! -v "%USERPROFILE%\.config\gh-devcontainer:/home/dev/.config/gh"
+set VOLUME_ARGS=!VOLUME_ARGS! -v claude-devcontainer-mise:/home/dev/.local/share/mise
 set CONTAINER_NAME=
 set PROJECT_NAME=
 set WORKDIR_ARGS=

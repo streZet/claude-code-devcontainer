@@ -6,6 +6,7 @@ if [[ -f "$HOME/.gitconfig" ]]; then
 fi
 mkdir -p "$HOME/.config/gh-devcontainer"
 VOLUME_ARGS+=(-v "$HOME/.config/gh-devcontainer:/home/dev/.config/gh")
+VOLUME_ARGS+=(-v claude-devcontainer-mise:/home/dev/.local/share/mise)
 CONTAINER_NAME=""
 PROJECT_NAME=""
 SSH_ARGS=()
@@ -125,5 +126,5 @@ else
         SECRET_ARGS=(--mount "type=bind,src=$TOKEN_FILE,dst=/run/secrets/claude_token,readonly")
     fi
     echo "Host port: $HOST_PORT -> container port 3000"
-    docker run -it --name "$CONTAINER_NAME" -p "$HOST_PORT:3000""${VOLUME_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
+    docker run -it --name "$CONTAINER_NAME" -p "$HOST_PORT:3000" "${VOLUME_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
 fi

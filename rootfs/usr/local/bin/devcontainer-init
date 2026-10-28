@@ -1,0 +1,9 @@
+#!/bin/bash
+if [[ -n "$(mise ls --current 2> /dev/null)" ]]; then
+    echo "Installing project tools with mise..."
+    mise install || echo "Warning: mise install failed, continuing without project tools."
+else
+    echo "No tool versions found (mise.toml/.tool-versions/.nvmrc/.java-version). Skipping."
+fi
+
+exec "$@"

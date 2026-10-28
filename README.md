@@ -21,6 +21,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 - **Cross-platform** — works on Linux, macOS, and Windows with provided shell and batch scripts
 - **Mount your projects** — work on existing local codebases without copying files into the container
 - **Persistent config** — your `~/.claude` settings are mounted automatically and survive container restarts
+- **Per-project tool versions** — one generic image; Node, Java, Python, etc. are installed by [mise](https://mise.jdx.dev/) from the project's `mise.toml` and cached across containers
 - **`claude` wrapper** — `claude` inside the container is always invoked with `--dangerously-skip-permissions`, and on first run auto-initializes `~/.claude.json` (skips onboarding and trust prompts) so sessions start immediately
 - **OAuth token passthrough** — host `CLAUDE_CODE_OAUTH_TOKEN` is mounted as a Docker secret (`/run/secrets/claude_token`), avoiding env-var exposure
 
@@ -32,6 +33,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 | **Claude Code** | Native binary (installed via official installer) |
 | **User** | Non-root `dev` with passwordless sudo |
 | **Tools** | git, gh, ssh, curl, wget, jq, vim, python3, htop, tree, unzip, tar, less, dnsutils |
+| **Tool versions** | [mise](https://mise.jdx.dev/) installs project-specific Node/Java/Python/... on container start |
 | **Port** | 3000 exposed, mapped to the first free host port in 3000–3100 (or `--port`) |
 
 ## Quick Start
@@ -106,9 +108,64 @@ Each project gets its own working directory inside the container and its own con
 | `~/.gitconfig` | `/home/dev/.gitconfig` (read-only) | Git identity, only mounted if the file exists on the host |
 | `~/.config/gh-devcontainer` | `/home/dev/.config/gh` | GitHub CLI auth (`gh auth login`), separate from the host `gh`; created automatically |
 | `--workspace <path>` | `/home/dev/<basename>` | Your project directory; container `cwd` is set here |
+| Docker volume `claude-devcontainer-mise` | `/home/dev/.local/share/mise` | Tools installed by mise, shared by all containers; survives `--recreate` |
 | `~/.config/claude-devcontainer/<container>.token` (from host `CLAUDE_CODE_OAUTH_TOKEN`) | `/run/secrets/claude_token` (read-only) | OAuth token, only mounted if the env var is set when the container is created |
 
 Everything outside these mounts lives only inside the container and is lost on `--recreate`.
+
+## Project Tools (mise)
+
+On every container start, `devcontainer-init` runs `mise install` in the workspace if it finds a version file. Without one, the container starts with the base image only.
+
+```
+container start ──► version file in workspace?
+                       ├─ yes ──► mise install ──► volume claude-devcontainer-mise (cache)
+                       └─ no  ──► skip
+```
+
+| File | Example |
+|------|---------|
+| `mise.toml` | `[tools]`<br>`node = "26"`<br>`java = "temurin-21"` |
+| `.tool-versions` | `node 26`<br>`java temurin-21` |
+| `.nvmrc` / `.node-version` | `26` |
+| `.java-version` | `21` |
+| `.python-version` | `3.13` |
+
+Tools are available through mise shims, so `node`, `npm`, `java` work in any shell, including Claude Code's Bash tool.
+
+### Setting up a project
+
+The image contains only mise itself, not the tool versions. Each project must declare its versions, otherwise nothing is installed.
+
+Recommended: add `mise.toml` to the project root and commit it:
+
+```toml
+[tools]
+node  = "26"
+java  = "temurin-21"
+maven = "3.9"
+```
+
+Or create it from inside the container (writes `mise.toml` and installs the tools):
+
+```bash
+mise use node@26 java@temurin-21
+```
+
+| Case | What to use |
+|------|-------------|
+| Several languages (e.g. monorepo with npm + Java) | `mise.toml` in the repo root |
+| Different version in a subdirectory | additional `mise.toml` in that subdirectory (the nearest file wins) |
+| CI or other developers use nvm / `setup-node` | keep `.nvmrc` as well, `mise.toml` is read only by mise |
+| Personal, not committed settings | `mise.local.toml` (add to `.gitignore`) |
+
+### Notes
+
+- Without a version file the container works as before: base image only, no Node/Java.
+- The `claude-devcontainer-mise` volume is shared by all containers. In a project without a version file, `node` may print a mise error ("no version set") instead of `command not found` if another project already installed it.
+- The first install downloads the tools (Node ~30 s, JDK ~2 min); later starts reuse the cache (~1 s).
+- Changed versions are picked up on the next container start (`docker start` re-runs the entrypoint); no image rebuild needed.
+- To clear the cache: `docker volume rm claude-devcontainer-mise` (remove the containers using it first).
 
 ## SSH Agent Forwarding
 
@@ -141,7 +198,8 @@ ssh -T git@github.com
 4. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your settings. `~/.gitconfig` (if present) and `~/.config/gh-devcontainer` are mounted as well.
 5. With `--workspace <path>`, the host directory is mounted at `/home/dev/<basename>` and used as the container's `cwd`. The default container name is suffixed with the same basename so each project gets its own container.
 6. If the host has `CLAUDE_CODE_OAUTH_TOKEN` set, the script writes it to `~/.config/claude-devcontainer/<container>.token` and bind-mounts it as `/run/secrets/claude_token` (read-only). The wrapper exports it back to the env only inside the `claude` process. On every re-run of the script the file is overwritten with the current host value; a `UserPromptSubmit` hook (`/usr/local/bin/claude-token-check`, loaded via `--settings`) warns when the running `claude` uses an outdated token and needs a restart.
-7. The wrapper also self-heals `~/.claude.json` on each invocation, ensuring `hasCompletedOnboarding`, `lastOnboardingVersion`, and per-project `hasTrustDialogAccepted` are set.
+7. The entrypoint `/usr/local/bin/devcontainer-init` runs `mise install` for the workspace (see [Project Tools](#project-tools-mise)) and then starts the shell.
+8. The wrapper also self-heals `~/.claude.json` on each invocation, ensuring `hasCompletedOnboarding`, `lastOnboardingVersion`, and per-project `hasTrustDialogAccepted` are set.
 
 ## Related Projects
 
