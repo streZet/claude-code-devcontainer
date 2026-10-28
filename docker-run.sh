@@ -116,8 +116,13 @@ if docker container inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
         fi
     fi
     echo ""
-    echo "Starting existing container..."
-    docker start -ai "$CONTAINER_NAME"
+    if [[ "$(docker container inspect "$CONTAINER_NAME" --format '{{.State.Running}}')" == "true" ]]; then
+        echo "Container is running, opening a new shell..."
+        docker exec -it "$CONTAINER_NAME" bash
+    else
+        echo "Starting existing container..."
+        docker start -ai "$CONTAINER_NAME"
+    fi
 else
     resolve_port || exit 1
     if [[ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then

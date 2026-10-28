@@ -93,8 +93,15 @@ if %errorlevel%==0 (
         )
     )
     echo.
-    echo Starting existing container...
-    docker start -ai !CONTAINER_NAME!
+    set RUNNING=
+    for /f %%R in ('docker container inspect !CONTAINER_NAME! --format "{{.State.Running}}"') do set RUNNING=%%R
+    if "!RUNNING!"=="true" (
+        echo Container is running, opening a new shell...
+        docker exec -it !CONTAINER_NAME! bash
+    ) else (
+        echo Starting existing container...
+        docker start -ai !CONTAINER_NAME!
+    )
 ) else (
     if defined CLAUDE_CODE_OAUTH_TOKEN (
         if not exist "!TOKEN_DIR!" mkdir "!TOKEN_DIR!"

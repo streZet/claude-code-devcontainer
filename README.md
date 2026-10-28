@@ -75,6 +75,8 @@ docker-run.bat [--workspace <path>] [--name <container-name>] [--port <host-port
 
 Each project gets its own working directory inside the container and its own container by default, so you can run multiple projects in parallel without collisions.
 
+Re-running the script for an existing container: a stopped container is started (`docker start -ai`); a running one gets an additional shell (`docker exec -it ... bash`), so you can open several terminals into the same container.
+
 #### Examples
 
 ```bash
