@@ -17,6 +17,8 @@ set PORT=
 set HOST_PORT=
 set PORT_RANGE_START=3000
 set PORT_RANGE_END=3100
+set CONTAINER_PORT=3000
+set CONFIG_ARGS=
 
 set TOKEN_DIR=%USERPROFILE%\.config\claude-devcontainer
 :parse_args
@@ -71,6 +73,8 @@ if defined RECREATE (
 
 docker container inspect !CONTAINER_NAME! >nul 2>&1
 if errorlevel 1 (
+    call :read_config
+    if errorlevel 1 exit /b 1
     call :resolve_port
     if errorlevel 1 exit /b 1
 )
@@ -120,11 +124,51 @@ if %errorlevel%==0 (
             set CACHE_ARGS=!CACHE_ARGS! -v !CONTAINER_NAME!_next:/home/dev/!PROJECT_NAME!/.next
         )
     )
-    echo Host port: !HOST_PORT! -^> container port 3000
-    docker run -it --name !CONTAINER_NAME! -p !HOST_PORT!:3000 !VOLUME_ARGS! !CACHE_ARGS! !WORKDIR_ARGS! !SECRET_ARGS! claude-code-development
+    echo Host port: !HOST_PORT! -^> container port !CONTAINER_PORT!
+    docker run -it --name !CONTAINER_NAME! -p !HOST_PORT!:!CONTAINER_PORT! !VOLUME_ARGS! !CACHE_ARGS! !CONFIG_ARGS! !WORKDIR_ARGS! !SECRET_ARGS! claude-code-development
 )
 endlocal
 exit /b
+
+:read_config
+if not defined PROJECT_NAME exit /b 0
+set "CONFIG_FILE=!WORKSPACE_PATH!\.claude-code-devcontainer"
+if not exist "!CONFIG_FILE!" exit /b 0
+echo Config: !CONFIG_FILE!
+for /f "usebackq eol=# tokens=1,* delims==" %%A in ("!CONFIG_FILE!") do (
+    call :apply_config "%%A" "%%B"
+    if errorlevel 1 exit /b 1
+)
+set /a PORT_RANGE_START=CONTAINER_PORT, PORT_RANGE_END=CONTAINER_PORT+100
+exit /b 0
+
+:apply_config
+set "CFG_KEY=%~1"
+set "CFG_VAL=%~2"
+if not defined CFG_VAL (
+    echo Error: empty value for "!CFG_KEY!" in .claude-code-devcontainer
+    exit /b 1
+)
+set "CFG_VAL=!CFG_VAL:${=%%!"
+set "CFG_VAL=!CFG_VAL:}=%%!"
+call set "CFG_VAL=!CFG_VAL!"
+if /i "!CFG_KEY!"=="volume" (
+    echo   volume: !CFG_VAL!
+    set CONFIG_ARGS=!CONFIG_ARGS! -v "!CFG_VAL!"
+    exit /b 0
+)
+if /i "!CFG_KEY!"=="env" (
+    for /f "delims==" %%N in ("!CFG_VAL!") do echo   env: %%N
+    set CONFIG_ARGS=!CONFIG_ARGS! -e "!CFG_VAL!"
+    exit /b 0
+)
+if /i "!CFG_KEY!"=="port" (
+    echo   port: !CFG_VAL!
+    set /a CONTAINER_PORT=CFG_VAL
+    exit /b 0
+)
+echo Error: unknown key "!CFG_KEY!" in .claude-code-devcontainer
+exit /b 1
 
 :write_token
 powershell -NoProfile -Command "Set-Content -NoNewline -Path $env:TOKEN_FILE -Value $env:CLAUDE_CODE_OAUTH_TOKEN"

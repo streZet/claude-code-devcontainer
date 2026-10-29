@@ -1,0 +1,12 @@
+# Copy to <project>/.claude-code-devcontainer (do not commit it) and adjust.
+# Read by docker-run.bat / docker-run.sh when the container is created; apply changes with --recreate.
+# Format: key=value, no spaces around "=". ${VAR} is replaced with the host environment variable.
+
+# Extra bind mount (repeatable): <host path>:<container path>[:ro]
+#volume=${USERPROFILE}\.config\gcloud\keys:/home/dev/.config/gcloud/keys:ro
+
+# Environment variable in the container (repeatable): NAME=value
+#env=GOOGLE_APPLICATION_CREDENTIALS=/home/dev/.config/gcloud/keys/<key>.json
+
+# Container port published to the host (default 3000); the host port is the first free one starting from it
+#port=3001

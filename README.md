@@ -34,7 +34,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 | **User** | Non-root `dev` with passwordless sudo |
 | **Tools** | git, gh, ssh, curl, wget, jq, vim, python3, htop, tree, unzip, tar, less, dnsutils |
 | **Tool versions** | [mise](https://mise.jdx.dev/) installs project-specific Node/Java/Python/... on container start |
-| **Port** | 3000 exposed, mapped to the first free host port in 3000–3100 (or `--port`) |
+| **Port** | Container port 3000 (or `port=` in [`.claude-code-devcontainer`](#project-config-claude-code-devcontainer)), mapped to the first free host port starting from it (or `--port`) |
 
 ## Quick Start
 
@@ -70,7 +70,7 @@ docker-run.bat [--workspace <path>] [--name <container-name>] [--port <host-port
 | `--workspace` | Local directory to mount to `/home/dev/<basename>` (basename sanitized to `[a-zA-Z0-9._-]`) | none |
 | `--name` | Custom Docker container name | `claude-code-development_<basename>` if `--workspace` given, otherwise `claude-code-development` |
 | `--ssh` | Enable SSH agent forwarding (Linux/macOS only) | disabled |
-| `--port` | Host port mapped to container port 3000; fails if busy (applied on container creation) | first free port in 3000–3100 |
+| `--port` | Host port mapped to the container port; fails if busy (applied on container creation) | first free port in `<container port>`–`<container port>+100` |
 | `--recreate` | Remove the existing container and create a new one from the current image (data outside mounted volumes is lost) | disabled |
 
 Each project gets its own working directory inside the container and its own container by default, so you can run multiple projects in parallel without collisions.
@@ -170,6 +170,32 @@ mise use node@26 java@temurin-21
 - The first install downloads the tools (Node ~30 s, JDK ~2 min); later starts reuse the cache (~1 s).
 - Changed versions are picked up on the next container start (`docker start` re-runs the entrypoint); no image rebuild needed.
 - To clear the cache: `docker volume rm claude-devcontainer-mise` (remove the containers using it first).
+
+## Project Config (.claude-code-devcontainer)
+
+Project-specific container settings that do not belong in this generic repo (host paths, keys, ports) go into `<workspace>\.claude-code-devcontainer`. The file holds machine-specific paths, so do not commit it: add it to the project's `.gitignore` and commit a `.claude-code-devcontainer.example` instead.
+
+```bash
+copy .claude-code-devcontainer.example C:\path\to\project\.claude-code-devcontainer   # template from this repo
+```
+
+```ini
+# comment
+volume=${USERPROFILE}\.config\gcloud\keys:/home/dev/.config/gcloud/keys:ro
+env=GOOGLE_APPLICATION_CREDENTIALS=/home/dev/.config/gcloud/keys/<key>.json
+port=3001
+```
+
+| Key | Repeatable | Effect |
+|-----|------------|--------|
+| `volume` | ✓ | extra `-v <host path>:<container path>[:ro]` |
+| `env` | ✓ | extra `-e NAME=value` (only the name is printed) |
+| `port` | ✗ | container port (default 3000); the host port is the first free one starting from it, or `--port` |
+
+- Format: `key=value`, no spaces around `=`, `#` starts a comment line.
+- `${VAR}` is replaced with the host environment variable (`USERPROFILE` on Windows, `HOME` on Linux/macOS).
+- Read only when the container is created: apply changes with `--recreate`.
+- Without the file nothing changes. An unknown key or empty value stops the script with an error.
 
 ## Build Caches
 

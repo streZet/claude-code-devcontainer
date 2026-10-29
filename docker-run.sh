@@ -17,6 +17,8 @@ PORT=""
 HOST_PORT=""
 PORT_RANGE_START=3000
 PORT_RANGE_END=3100
+CONTAINER_PORT=3000
+CONFIG_ARGS=()
 
 TOKEN_DIR="$HOME/.config/claude-devcontainer"
 
@@ -49,6 +51,51 @@ resolve_port() {
     done
     echo "Error: no free port in range $PORT_RANGE_START-$PORT_RANGE_END."
     return 1
+}
+
+expand_vars() {
+    local value="$1"
+    while [[ "$value" =~ \$\{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
+        value="${value//"${BASH_REMATCH[0]}"/"${!BASH_REMATCH[1]}"}"
+    done
+    printf '%s' "$value"
+}
+
+read_config() {
+    [[ -n "$PROJECT_NAME" ]] || return 0
+    local file="$WORKSPACE_PATH/.claude-code-devcontainer" line key value
+    [[ -f "$file" ]] || return 0
+    echo "Config: $file"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        key="${line%%=*}"
+        value="$(expand_vars "${line#*=}")"
+        if [[ -z "$value" ]]; then
+            echo "Error: empty value for \"$key\" in .claude-code-devcontainer"
+            return 1
+        fi
+        case "$key" in
+            volume)
+                echo "  volume: $value"
+                CONFIG_ARGS+=(-v "$value")
+                ;;
+            env)
+                echo "  env: ${value%%=*}"
+                CONFIG_ARGS+=(-e "$value")
+                ;;
+            port)
+                echo "  port: $value"
+                CONTAINER_PORT="$value"
+                ;;
+            *)
+                echo "Error: unknown key \"$key\" in .claude-code-devcontainer"
+                return 1
+                ;;
+        esac
+    done < "$file"
+    PORT_RANGE_START=$CONTAINER_PORT
+    PORT_RANGE_END=$((CONTAINER_PORT + 100))
 }
 
 while [[ $# -gt 0 ]]; do
@@ -124,6 +171,7 @@ if docker container inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
         docker start -ai "$CONTAINER_NAME"
     fi
 else
+    read_config || exit 1
     resolve_port || exit 1
     if [[ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
         TOKEN_FILE="$TOKEN_DIR/$CONTAINER_NAME.token"
@@ -141,6 +189,6 @@ else
             CACHE_ARGS+=(-v "${CONTAINER_NAME}_next:/home/dev/$PROJECT_NAME/.next")
         fi
     fi
-    echo "Host port: $HOST_PORT -> container port 3000"
-    docker run -it --name "$CONTAINER_NAME" -p "$HOST_PORT:3000" "${VOLUME_ARGS[@]}" "${CACHE_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
+    echo "Host port: $HOST_PORT -> container port $CONTAINER_PORT"
+    docker run -it --name "$CONTAINER_NAME" -p "$HOST_PORT:$CONTAINER_PORT" "${VOLUME_ARGS[@]}" "${CACHE_ARGS[@]}" "${CONFIG_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
 fi
