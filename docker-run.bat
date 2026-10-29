@@ -109,8 +109,19 @@ if %errorlevel%==0 (
         call :write_token
         set SECRET_ARGS=--mount type=bind,src="!TOKEN_FILE!",dst=/run/secrets/claude_token,readonly
     )
+    set CACHE_ARGS=
+    if defined PROJECT_NAME (
+        if exist "!WORKSPACE_PATH!\package.json" (
+            echo Cache volume: !CONTAINER_NAME!_node_modules -^> node_modules
+            set CACHE_ARGS=-v !CONTAINER_NAME!_node_modules:/home/dev/!PROJECT_NAME!/node_modules
+        )
+        if exist "!WORKSPACE_PATH!\next.config.*" (
+            echo Cache volume: !CONTAINER_NAME!_next -^> .next
+            set CACHE_ARGS=!CACHE_ARGS! -v !CONTAINER_NAME!_next:/home/dev/!PROJECT_NAME!/.next
+        )
+    )
     echo Host port: !HOST_PORT! -^> container port 3000
-    docker run -it --name !CONTAINER_NAME! -p !HOST_PORT!:3000 !VOLUME_ARGS! !WORKDIR_ARGS! !SECRET_ARGS! claude-code-development
+    docker run -it --name !CONTAINER_NAME! -p !HOST_PORT!:3000 !VOLUME_ARGS! !CACHE_ARGS! !WORKDIR_ARGS! !SECRET_ARGS! claude-code-development
 )
 endlocal
 exit /b

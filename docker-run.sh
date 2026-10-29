@@ -130,6 +130,17 @@ else
         write_token "$TOKEN_FILE"
         SECRET_ARGS=(--mount "type=bind,src=$TOKEN_FILE,dst=/run/secrets/claude_token,readonly")
     fi
+    CACHE_ARGS=()
+    if [[ -n "$PROJECT_NAME" ]]; then
+        if [[ -f "$WORKSPACE_PATH/package.json" ]]; then
+            echo "Cache volume: ${CONTAINER_NAME}_node_modules -> node_modules"
+            CACHE_ARGS+=(-v "${CONTAINER_NAME}_node_modules:/home/dev/$PROJECT_NAME/node_modules")
+        fi
+        if ls "$WORKSPACE_PATH"/next.config.* > /dev/null 2>&1; then
+            echo "Cache volume: ${CONTAINER_NAME}_next -> .next"
+            CACHE_ARGS+=(-v "${CONTAINER_NAME}_next:/home/dev/$PROJECT_NAME/.next")
+        fi
+    fi
     echo "Host port: $HOST_PORT -> container port 3000"
-    docker run -it --name "$CONTAINER_NAME" -p "$HOST_PORT:3000" "${VOLUME_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
+    docker run -it --name "$CONTAINER_NAME" -p "$HOST_PORT:3000" "${VOLUME_ARGS[@]}" "${CACHE_ARGS[@]}" "${SSH_ARGS[@]}" "${SECRET_ARGS[@]}" "${WORKDIR_ARGS[@]}" claude-code-development
 fi

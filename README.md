@@ -111,6 +111,8 @@ Re-running the script for an existing container: a stopped container is started 
 | `~/.config/gh-devcontainer` | `/home/dev/.config/gh` | GitHub CLI auth (`gh auth login`), separate from the host `gh`; created automatically |
 | `--workspace <path>` | `/home/dev/<basename>` | Your project directory; container `cwd` is set here |
 | Docker volume `claude-devcontainer-mise` | `/home/dev/.local/share/mise` | Tools installed by mise, shared by all containers; survives `--recreate` |
+| Docker volume `<container>_node_modules` | `/home/dev/<basename>/node_modules` | Only if the workspace has `package.json`; see [Build Caches](#build-caches) |
+| Docker volume `<container>_next` | `/home/dev/<basename>/.next` | Only if the workspace has `next.config.*`; see [Build Caches](#build-caches) |
 | `~/.config/claude-devcontainer/<container>.token` (from host `CLAUDE_CODE_OAUTH_TOKEN`) | `/run/secrets/claude_token` (read-only) | OAuth token, only mounted if the env var is set when the container is created |
 
 Everything outside these mounts lives only inside the container and is lost on `--recreate`.
@@ -169,6 +171,24 @@ mise use node@26 java@temurin-21
 - Changed versions are picked up on the next container start (`docker start` re-runs the entrypoint); no image rebuild needed.
 - To clear the cache: `docker volume rm claude-devcontainer-mise` (remove the containers using it first).
 
+## Build Caches
+
+On Windows/macOS the workspace is a bind mount from the host, and every file access crosses the host ↔ VM boundary. `npm ci` and Next.js compilation read tens of thousands of files in `node_modules` and `.next`, which makes them very slow there.
+
+When the container is created, `docker-run` mounts these directories as named volumes on the Linux filesystem:
+
+```
+/home/dev/<basename>              ──► host folder (bind mount, sources)
+ ├─ node_modules                  ──► volume <container>_node_modules  (if package.json)
+ └─ .next                         ──► volume <container>_next          (if next.config.*)
+```
+
+- The host's `node_modules` and `.next` are hidden inside the container, so Windows binaries (e.g. sharp, Prisma engines) do not conflict with Linux ones.
+- The volumes start empty: run `npm ci` once inside the container.
+- They survive `--recreate`. Detection runs only when the container is created, so add `--recreate` after adding `package.json` to a project.
+- The IDE on the host does not see the container's `node_modules`; keep a separate host install if the IDE needs it.
+- To reset: remove the container, then `docker volume rm <container>_node_modules <container>_next`.
+
 ## SSH Agent Forwarding
 
 The `--ssh` flag forwards your host's SSH agent into the container, allowing `git clone`, `git push`, and other SSH operations without copying private keys into the container.
@@ -200,7 +220,7 @@ ssh -T git@github.com
 4. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your settings. `~/.gitconfig` (if present) and `~/.config/gh-devcontainer` are mounted as well.
 5. With `--workspace <path>`, the host directory is mounted at `/home/dev/<basename>` and used as the container's `cwd`. The default container name is suffixed with the same basename so each project gets its own container.
 6. If the host has `CLAUDE_CODE_OAUTH_TOKEN` set, the script writes it to `~/.config/claude-devcontainer/<container>.token` and bind-mounts it as `/run/secrets/claude_token` (read-only). The wrapper exports it back to the env only inside the `claude` process. On every re-run of the script the file is overwritten with the current host value; a `UserPromptSubmit` hook (`/usr/local/bin/claude-token-check`, loaded via `--settings`) warns when the running `claude` uses an outdated token and needs a restart.
-7. The entrypoint `/usr/local/bin/devcontainer-init` runs `mise install` for the workspace (see [Project Tools](#project-tools-mise)) and then starts the shell.
+7. The entrypoint `/usr/local/bin/devcontainer-init` gives `dev` ownership of the cache volumes (see [Build Caches](#build-caches)), runs `mise install` for the workspace (see [Project Tools](#project-tools-mise)) and then starts the shell.
 8. The wrapper also self-heals `~/.claude.json` on each invocation, ensuring `hasCompletedOnboarding`, `lastOnboardingVersion`, and per-project `hasTrustDialogAccepted` are set.
 
 ## Related Projects

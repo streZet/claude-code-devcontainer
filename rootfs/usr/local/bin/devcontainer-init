@@ -1,4 +1,10 @@
 #!/bin/bash
+for dir in node_modules .next; do
+    if mountpoint -q "$dir" && [[ "$(stat -c %U "$dir")" != dev ]]; then
+        sudo chown dev:dev "$dir"
+    fi
+done
+
 if [[ -n "$(mise ls --current 2> /dev/null)" ]]; then
     echo "Installing project tools with mise..."
     mise install || echo "Warning: mise install failed, continuing without project tools."
