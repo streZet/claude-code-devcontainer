@@ -21,6 +21,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 - **Cross-platform** — works on Linux, macOS, and Windows with provided shell and batch scripts
 - **Mount your projects** — work on existing local codebases without copying files into the container
 - **Persistent config** — your `~/.claude` settings are mounted automatically and survive container restarts
+- **Per-project container config** — extra mounts, env vars and the app port in an uncommitted `.claude-code-devcontainer` file in the project, without changing this repo
 - **Per-project tool versions** — one generic image; Node, Java, Python, etc. are installed by [mise](https://mise.jdx.dev/) from the project's `mise.toml` and cached across containers
 - **`claude` wrapper** — `claude` inside the container is always invoked with `--dangerously-skip-permissions`, and on first run auto-initializes `~/.claude.json` (skips onboarding and trust prompts) so sessions start immediately
 - **OAuth token passthrough** — host `CLAUDE_CODE_OAUTH_TOKEN` is mounted as a Docker secret (`/run/secrets/claude_token`), avoiding env-var exposure
@@ -113,6 +114,7 @@ Re-running the script for an existing container: a stopped container is started 
 | Docker volume `claude-devcontainer-mise` | `/home/dev/.local/share/mise` | Tools installed by mise, shared by all containers; survives `--recreate` |
 | Docker volume `<container>_node_modules` | `/home/dev/<basename>/node_modules` | Only if the workspace has `package.json`; see [Build Caches](#build-caches) |
 | Docker volume `<container>_next` | `/home/dev/<basename>/.next` | Only if the workspace has `next.config.*`; see [Build Caches](#build-caches) |
+| `volume=` entries in `<workspace>\.claude-code-devcontainer` | as configured | Project-specific extra mounts; see [Project Config](#project-config-claude-code-devcontainer) |
 | `~/.config/claude-devcontainer/<container>.token` (from host `CLAUDE_CODE_OAUTH_TOKEN`) | `/run/secrets/claude_token` (read-only) | OAuth token, only mounted if the env var is set when the container is created |
 
 Everything outside these mounts lives only inside the container and is lost on `--recreate`.
@@ -182,7 +184,7 @@ copy .claude-code-devcontainer.example C:\path\to\project\.claude-code-devcontai
 ```ini
 # comment
 volume=${USERPROFILE}\.config\gcloud\keys:/home/dev/.config/gcloud/keys:ro
-env=GOOGLE_APPLICATION_CREDENTIALS=/home/dev/.config/gcloud/keys/<key>.json
+env=NODE_OPTIONS=--max-old-space-size=4096
 port=3001
 ```
 
@@ -196,6 +198,31 @@ port=3001
 - `${VAR}` is replaced with the host environment variable (`USERPROFILE` on Windows, `HOME` on Linux/macOS).
 - Read only when the container is created: apply changes with `--recreate`.
 - Without the file nothing changes. An unknown key or empty value stops the script with an error.
+
+### What goes where
+
+The file is for settings that only `docker run` can apply:
+
+| Setting | Key |
+|---------|-----|
+| Host directory with keys/certificates | `volume=` |
+| Port the app listens on | `port=` |
+| Container-only env vars (`NODE_OPTIONS`, telemetry flags, ...) | `env=` |
+
+### Why `port`
+
+Docker publishes only the ports given on `docker run`, and they cannot be changed later. The script publishes one container port (3000 by default). If the app listens on another port, the host gets an empty response:
+
+```
+without port:   host 3000 ──► container 3000 (nothing listens)   ──► empty response
+                container 3001 (next dev)    ──► not published
+
+port=3001:      host 3001 ──► container 3001 (next dev) ✓
+```
+
+Keeping the host port equal to the app port also keeps absolute URLs working (e.g. OAuth callbacks to `http://localhost:3001`). `--port` changes only the host side (`-p <host>:<container port>`).
+
+To reach services on the host (e.g. a database from `docker compose`), use `host.docker.internal` instead of `localhost`: inside the container, `localhost` is the container itself.
 
 ## Build Caches
 
@@ -246,8 +273,9 @@ ssh -T git@github.com
 4. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your settings. `~/.gitconfig` (if present) and `~/.config/gh-devcontainer` are mounted as well.
 5. With `--workspace <path>`, the host directory is mounted at `/home/dev/<basename>` and used as the container's `cwd`. The default container name is suffixed with the same basename so each project gets its own container.
 6. If the host has `CLAUDE_CODE_OAUTH_TOKEN` set, the script writes it to `~/.config/claude-devcontainer/<container>.token` and bind-mounts it as `/run/secrets/claude_token` (read-only). The wrapper exports it back to the env only inside the `claude` process. On every re-run of the script the file is overwritten with the current host value; a `UserPromptSubmit` hook (`/usr/local/bin/claude-token-check`, loaded via `--settings`) warns when the running `claude` uses an outdated token and needs a restart.
-7. The entrypoint `/usr/local/bin/devcontainer-init` gives `dev` ownership of the cache volumes (see [Build Caches](#build-caches)), runs `mise install` for the workspace (see [Project Tools](#project-tools-mise)) and then starts the shell.
-8. The wrapper also self-heals `~/.claude.json` on each invocation, ensuring `hasCompletedOnboarding`, `lastOnboardingVersion`, and per-project `hasTrustDialogAccepted` are set.
+7. When the container is created, `docker-run` adds named volumes for `node_modules` / `.next` (see [Build Caches](#build-caches)) and applies `<workspace>\.claude-code-devcontainer` (extra volumes, env vars, container port; see [Project Config](#project-config-claude-code-devcontainer)).
+8. The entrypoint `/usr/local/bin/devcontainer-init` gives `dev` ownership of the cache volumes (see [Build Caches](#build-caches)), runs `mise install` for the workspace (see [Project Tools](#project-tools-mise)) and then starts the shell.
+9. The wrapper also self-heals `~/.claude.json` on each invocation, ensuring `hasCompletedOnboarding`, `lastOnboardingVersion`, and per-project `hasTrustDialogAccepted` are set.
 
 ## Related Projects
 

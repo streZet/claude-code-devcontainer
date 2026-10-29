@@ -6,7 +6,7 @@
 #volume=${USERPROFILE}\.config\gcloud\keys:/home/dev/.config/gcloud/keys:ro
 
 # Environment variable in the container (repeatable): NAME=value
-#env=GOOGLE_APPLICATION_CREDENTIALS=/home/dev/.config/gcloud/keys/<key>.json
+#env=NODE_OPTIONS=--max-old-space-size=4096
 
 # Container port published to the host (default 3000); the host port is the first free one starting from it
 #port=3001
