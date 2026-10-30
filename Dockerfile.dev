@@ -26,6 +26,14 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
+# Google Chrome (amd64 only)
+RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+        curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+        && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+        && apt-get update && apt-get install -y google-chrome-stable \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # Create non-root user
 RUN useradd -m -s /bin/bash dev \
     && echo "dev ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
@@ -51,6 +59,10 @@ RUN curl -fsSL https://mise.run | sh \
 USER root
 COPY rootfs/ /
 RUN chmod +x /usr/local/bin/claude /usr/local/bin/claude-token-check /usr/local/bin/devcontainer-init \
+    && if [ -x /opt/google/chrome/chrome ]; then \
+        mv /opt/google/chrome/chrome /opt/google/chrome/chrome-bin \
+        && install -m 755 /usr/local/share/claude-devcontainer/chrome-wrapper /opt/google/chrome/chrome; \
+    fi \
     && chown -R dev:dev /home/dev
 USER dev
 ENV PATH="/usr/local/bin:${PATH}"

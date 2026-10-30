@@ -1,0 +1,7 @@
+#!/bin/bash
+ARGS=(--no-sandbox)
+if [[ -z "$DISPLAY" ]]; then
+    ARGS+=(--headless=new)
+fi
+
+exec /opt/google/chrome/chrome-bin "${ARGS[@]}" "$@"

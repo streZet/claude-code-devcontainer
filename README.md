@@ -22,6 +22,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 - **Mount your projects** — work on existing local codebases without copying files into the container
 - **Persistent config** — your `~/.claude` settings are mounted automatically and survive container restarts
 - **Per-project container config** — extra mounts, env vars and the app port in an uncommitted `.claude-code-devcontainer` file in the project, without changing this repo
+- **Browser included** — Google Chrome works out of the box for browser MCP servers (e.g. `chrome-devtools-mcp`) and headless tests
 - **Per-project tool versions** — one generic image; Node, Java, Python, etc. are installed by [mise](https://mise.jdx.dev/) from the project's `mise.toml` and cached across containers
 - **`claude` wrapper** — `claude` inside the container is always invoked with `--dangerously-skip-permissions`, and on first run auto-initializes `~/.claude.json` (skips onboarding and trust prompts) so sessions start immediately
 - **OAuth token passthrough** — host `CLAUDE_CODE_OAUTH_TOKEN` is mounted as a Docker secret (`/run/secrets/claude_token`), avoiding env-var exposure
@@ -34,6 +35,7 @@ This project solves both problems: Claude Code runs inside a Linux container whe
 | **Claude Code** | Native binary (installed via official installer) |
 | **User** | Non-root `dev` with passwordless sudo |
 | **Tools** | git, gh, ssh, curl, wget, jq, vim, python3, htop, tree, unzip, tar, less, dnsutils |
+| **Browser** | Google Chrome stable (amd64 only), headless; see [Browser](#browser) |
 | **Tool versions** | [mise](https://mise.jdx.dev/) installs project-specific Node/Java/Python/... on container start |
 | **Port** | Container port 3000 (or `port=` in [`.claude-code-devcontainer`](#project-config-claude-code-devcontainer)), mapped to the first free host port starting from it (or `--port`) |
 
@@ -242,6 +244,28 @@ When the container is created, `docker-run` mounts these directories as named vo
 - The IDE on the host does not see the container's `node_modules`; keep a separate host install if the IDE needs it.
 - To reset: remove the container, then `docker volume rm <container>_node_modules <container>_next`.
 
+## Browser
+
+The image includes Google Chrome stable (amd64 only; skipped on arm64). Chrome's sandbox cannot run inside Docker, and the container has no display, so `/opt/google/chrome/chrome` is replaced by a wrapper that always adds `--no-sandbox` and adds `--headless=new` when `DISPLAY` is not set:
+
+```
+chrome-devtools-mcp / puppeteer / google-chrome
+        │
+        ▼
+/opt/google/chrome/chrome       (wrapper: --no-sandbox [--headless=new])
+        │
+        ▼
+/opt/google/chrome/chrome-bin   (real Chrome)
+```
+
+No project changes are needed: an `.mcp.json` like this works as is:
+
+```json
+{ "mcpServers": { "chrome-devtools": { "command": "npx", "args": ["chrome-devtools-mcp@latest"] } } }
+```
+
+Chrome adds ~350 MB to the image.
+
 ## SSH Agent Forwarding
 
 The `--ssh` flag forwards your host's SSH agent into the container, allowing `git clone`, `git push`, and other SSH operations without copying private keys into the container.
@@ -269,7 +293,7 @@ ssh -T git@github.com
 
 1. The Dockerfile builds an Ubuntu 24.04 image with the Claude Code native binary installed.
 2. A non-root `dev` user is created for security.
-3. Files under `rootfs/` are overlaid onto the image (path under `rootfs/` mirrors the path inside the container). The wrapper at `/usr/local/bin/claude` shadows the real binary in `PATH` and always passes `--dangerously-skip-permissions` and `--settings /usr/local/share/claude-devcontainer/settings.json` (container-only hooks, merged with your host settings). `/etc/gitconfig` sets `safe.directory = *` and `gh auth git-credential` as the credential helper.
+3. Files under `rootfs/` are overlaid onto the image (path under `rootfs/` mirrors the path inside the container). The wrapper at `/usr/local/bin/claude` shadows the real binary in `PATH` and always passes `--dangerously-skip-permissions` and `--settings /usr/local/share/claude-devcontainer/settings.json` (container-only hooks, merged with your host settings). `/etc/gitconfig` sets `safe.directory = *` and `gh auth git-credential` as the credential helper. On amd64, Google Chrome is installed and `/opt/google/chrome/chrome` is replaced by `chrome-wrapper` (see [Browser](#browser)).
 4. On `docker run`, your local `~/.claude` config directory is mounted so Claude Code picks up your settings. `~/.gitconfig` (if present) and `~/.config/gh-devcontainer` are mounted as well.
 5. With `--workspace <path>`, the host directory is mounted at `/home/dev/<basename>` and used as the container's `cwd`. The default container name is suffixed with the same basename so each project gets its own container.
 6. If the host has `CLAUDE_CODE_OAUTH_TOKEN` set, the script writes it to `~/.config/claude-devcontainer/<container>.token` and bind-mounts it as `/run/secrets/claude_token` (read-only). The wrapper exports it back to the env only inside the `claude` process. On every re-run of the script the file is overwritten with the current host value; a `UserPromptSubmit` hook (`/usr/local/bin/claude-token-check`, loaded via `--settings`) warns when the running `claude` uses an outdated token and needs a restart.
