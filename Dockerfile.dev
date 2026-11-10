@@ -53,7 +53,8 @@ ENV MISE_YES=1 \
     PATH="/home/dev/.local/share/mise/shims:${PATH}"
 RUN curl -fsSL https://mise.run | sh \
     && mkdir -p /home/dev/.local/share/mise \
-    && mise --version
+    && mise --version \
+    && echo 'eval "$(mise activate bash)"' >> /home/dev/.bashrc
 
 # Overlay container files from rootfs/
 USER root

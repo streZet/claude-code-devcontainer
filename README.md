@@ -141,6 +141,8 @@ container start ──► version file in workspace?
 
 Tools are available through mise shims, so `node`, `npm`, `java` work in any shell, including Claude Code's Bash tool.
 
+mise is activated in `~/.bashrc`, so `[env]` from `mise.toml` (variables, `_.path`) is applied in the interactive shell and inherited by Claude Code started from it.
+
 ### Setting up a project
 
 The image contains only mise itself, not the tool versions. Each project must declare its versions, otherwise nothing is installed.
